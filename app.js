@@ -9,6 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/recipes', require('./routes/recipeRoutes'));
 
@@ -17,6 +18,7 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'Pick My Dish API is running!',
     endpoints: {
+      auth: '/api/auth',
       users: '/api/users',
       recipes: '/api/recipes',
       test: '/api/test-db'

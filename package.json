@@ -8,12 +8,10 @@
     "start": "node index.js",
     "test": "node test_db.js"
   },
-
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Kynmmarshall/Pick-My-Dish-Backend.git"
   },
-  
   "keywords": [],
   "author": "",
   "license": "ISC",
