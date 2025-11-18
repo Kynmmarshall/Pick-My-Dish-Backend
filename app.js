@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-require('./config/database'); // Database connection
+require('./config/database');
 
 const app = express();
 
@@ -9,8 +9,19 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/recipes', require('./routes/recipeRoutes'));
+
+// Basic test route
 app.get('/', (req, res) => {
-  res.json({ message: 'Pick My Dish API is running!' });
+  res.json({ 
+    message: 'Pick My Dish API is running!',
+    endpoints: {
+      users: '/api/users',
+      recipes: '/api/recipes',
+      test: '/api/test-db'
+    }
+  });
 });
 
 // Test database route
