@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-require('./config/database');
+const db = require('./config/database');
 
 const app = express();
 
@@ -9,9 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/recipes', require('./routes/recipeRoutes'));
+app.use('/api/auth', require('./routes/auth'));
 
 // Basic test route
 app.get('/', (req, res) => {
@@ -19,20 +17,19 @@ app.get('/', (req, res) => {
     message: 'Pick My Dish API is running!',
     endpoints: {
       auth: '/api/auth',
-      users: '/api/users',
-      recipes: '/api/recipes',
       test: '/api/test-db'
     }
   });
 });
 
-// Test database route
-app.get('/api/test-db', (req, res) => {
-  const db = require('./config/database');
-  db.query('SELECT * FROM categories', (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ categories: results });
-  });
+// Test database connection
+app.get('/api/test-db', async (req, res) => {
+  try {
+    const [results] = await db.execute('SELECT * FROM categories');
+    res.json({ message: 'Database connected!', categories: results });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error: ' + error.message });
+  }
 });
 
 module.exports = app;
