@@ -17,13 +17,13 @@ app.get('/', (req, res) => {
     message: 'Pick My Dish API is running!',
     endpoints: {
       auth: '/api/auth',
-      test: '/api/test-db'
+      test: '/api/pick_my_dish'
     }
   });
 });
 
 // Test database connection
-app.get('/api/test-db', async (req, res) => {
+app.get('/api/pick_my_dish', async (req, res) => {
   try {
     const [results] = await db.execute('SELECT * FROM categories');  // NEW WAY
     res.json({ message: 'Database connected!', categories: results });
