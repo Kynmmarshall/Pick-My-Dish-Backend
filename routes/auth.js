@@ -27,7 +27,7 @@ router.post('/register', async (req, res) => {
     // Create user (in real app, hash password!)
     const [result] = await db.execute(
       'INSERT INTO users (username, email, password_hash, full_name) VALUES (?, ?, ?, ?)',
-      [email.split('@')[0], email, password, fullName]
+      [fullName.split(' ')[0], email, password, fullName]
     );
     
     console.log('✅ USER CREATED SUCCESSFULLY - ID:', result.insertId);
