@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
+const auth = require('../middleware/auth');
 
 // Get user profile
 router.get('/profile', (req, res) => {
@@ -13,21 +14,17 @@ router.put('/profile', (req, res) => {
 });
 
 // UPDATE USERNAME - ADD THIS
-router.put('/username', async (req, res) => {
+router.put('/username', auth, async (req, res) => {
   try {
-    console.log('📝 UPDATE USERNAME REQUEST:', req.body);
-    
     const { username } = req.body;
-    const userId = 13; // Temporary - this should come from authentication
+    const userId = req.user.id; // From JWT token
     
-    console.log('🔧 Updating user:', userId, 'to username:', username);
+    console.log('🔄 Updating username for user:', userId, 'to:', username);
     
     const [result] = await db.execute(
       'UPDATE users SET username = ? WHERE id = ?',
       [username, userId]
     );
-    
-    console.log('✅ UPDATE RESULT:', result);
     
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'User not found' });
