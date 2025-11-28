@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
+const auth = require('../middleware/auth');
 
 // Get user profile
 router.get('/profile', (req, res) => {
@@ -13,7 +14,7 @@ router.put('/profile', (req, res) => {
 });
 
 // UPDATE USERNAME - ADD THIS
-router.put('/username', async (req, res) => {
+router.put('/username', auth, async (req, res) => {
   try {
     const { username, userId } = req.body;  // ← Get userId from request
     
