@@ -7,7 +7,7 @@ router.post('/register', async (req, res) => {
   console.log('📝 REGISTER REQUEST RECEIVED:', req.body);
   
   try {
-    const { fullName, email, password } = req.body;
+    const { userName, email, password } = req.body;
     
     console.log('🔍 Checking if user exists:', email);
     // Check if user exists
@@ -23,11 +23,11 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'User already exists' });
     }
     
-    console.log('👤 Creating new user:', { fullName, email });
+    console.log('👤 Creating new user:', { userName, email });
     // Create user (in real app, hash password!)
     const [result] = await db.execute(
-      'INSERT INTO users (username, email, password_hash, full_name) VALUES (?, ?, ?, ?)',
-      [fullName.split(' ')[0], email, password, fullName]
+      'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
+      [userName, email, password]
     );
     
     console.log('✅ USER CREATED SUCCESSFULLY - ID:', result.insertId);
