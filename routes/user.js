@@ -13,7 +13,7 @@ router.put('/profile', (req, res) => {
   res.json({ message: 'Update profile endpoint' });
 });
 
-// UPDATE USERNAME - ADD THIS
+// UPDATE USERNAME 
 router.put('/username', async (req, res) => {
   try {
     const { username, userId } = req.body;  // ← Get userId from request
@@ -29,6 +29,22 @@ router.put('/username', async (req, res) => {
   } catch (error) {
     console.log('❌ Database error: $error');
     res.status(500).json({ error: 'Failed to update username' });
+  }
+});
+
+// UPDATE user profile picture
+router.put('/profile-picture', async (req, res) => {
+  try {
+    const { userId, imagePath } = req.body;
+    
+    await db.execute(
+      'UPDATE users SET profile_image_path = ? WHERE id = ?',
+      [imagePath, userId]
+    );
+    
+    res.json({ message: 'Profile picture updated' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update profile picture' });
   }
 });
 
