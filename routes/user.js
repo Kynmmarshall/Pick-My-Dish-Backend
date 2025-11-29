@@ -18,7 +18,7 @@ router.put('/username', async (req, res) => {
   try {
     const { username, userId } = req.body;  // ← Get userId from request
     
-    debugPrint('🔄 Updating username for user $userId to: $username');
+    console.log('🔄 Updating username for user $userId to: $username');
 
     await db.execute(
       'UPDATE users SET username = ? WHERE id = ?',
@@ -27,7 +27,7 @@ router.put('/username', async (req, res) => {
     
     res.json({ message: 'Username updated successfully' });
   } catch (error) {
-    debugPrint('❌ Database error: $error');
+    console.log('❌ Database error: $error');
     res.status(500).json({ error: 'Failed to update username' });
   }
 });
