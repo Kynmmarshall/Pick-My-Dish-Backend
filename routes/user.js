@@ -1,7 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
-//const auth = require('../middleware/auth');
+const multer = require('multer'); 
+const path = require('path');     
+
+
+// Configure multer for file uploads 
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/profile-pictures/');
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
 
 // Get user profile
 router.get('/profile', (req, res) => {
@@ -35,19 +51,12 @@ router.put('/username', async (req, res) => {
 // UPDATE user profile picture
 router.put('/profile-picture', upload.single('image'), async (req, res) => {
   try {
-    const { email } = req.body; // Send user's email from Flutter
+    const userId = req.body.userId;
     
-    // Get user ID from email
-    const [users] = await db.execute(
-      'SELECT id FROM users WHERE email = ?',
-      [email]
-    );
-    
-    if (users.length == 0) {
-      return res.status(404).json({ error: 'User not found' });
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
     }
     
-    const userId = users[0].id;
     const imagePath = req.file.path;
     
     await db.execute(
@@ -55,12 +64,17 @@ router.put('/profile-picture', upload.single('image'), async (req, res) => {
       [imagePath, userId]
     );
     
-    res.json({ message: 'Profile picture updated', imagePath });
+    res.json({ 
+      message: 'Profile picture updated',
+      imagePath: imagePath
+    });
   } catch (error) {
+    console.error('Profile picture error:', error);
     res.status(500).json({ error: 'Failed to update profile picture' });
   }
 });
 
+// GET user profile picture
 router.get('/profile-picture', async (req, res) => {
   try {
     const userId = req.query.userId; // Get from query parameter
