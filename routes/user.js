@@ -57,7 +57,7 @@ router.put('/profile-picture', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image file provided' });
     }
     
-    const imagePath = req.file.path;
+    const imagePath = req.file.path.replace(/^.*[\\\/]uploads[\\\/]/, 'uploads/');
     
     await db.execute(
       'UPDATE users SET profile_image_path = ? WHERE id = ?',
@@ -91,7 +91,7 @@ router.get('/profile-picture', async (req, res) => {
     const user = users[0];
     
     if (user.profile_image_path) {
-      res.json({ imagePath: user.profile_image_path });
+      res.json({ imagePath: user.profile_image_path.replace(/^.*[\\\/]uploads[\\\/]/, 'uploads/') });
     } else {
       res.json({ imagePath: 'assets/login/noPicture.png' });
     }
