@@ -62,11 +62,11 @@ router.post('/recipes', upload.single('picture'), async (req, res) => {
       return res.status(400).json({ error: 'Name, category, and userId are required' });
     }
     
-    let picturePath = null;
+    let imagePath = null;
     if (req.file) {
       // Store relative path
-      picturePath = req.file.path.replace(/^.*[\\\/]uploads[\\\/]/, 'uploads/');
-      console.log('🖼️ Picture saved at:', picturePath);
+      imagePath = req.file.path.replace(/^.*[\\\/]uploads[\\\/]/, 'uploads/');
+      console.log('🖼️ Picture saved at:', imagePath);
     }
     
     // Convert arrays to JSON strings for database storage
@@ -89,7 +89,7 @@ router.post('/recipes', upload.single('picture'), async (req, res) => {
         calories || null, 
         ingredientsJson || null, 
         instructionsJson || null, 
-        picturePath
+        imagePath
       ]
     );
     
@@ -99,7 +99,7 @@ router.post('/recipes', upload.single('picture'), async (req, res) => {
       success: true,
       message: 'Recipe created successfully', 
       recipeId: result.insertId,
-      picturePath: picturePath 
+      imagePath: imagePath 
     });
     
   } catch (error) {
