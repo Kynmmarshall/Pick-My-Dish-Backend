@@ -144,8 +144,10 @@ router.get('/recipes', async (req, res) => {
         calories: recipe.calories,
         image_path: recipe.image_path,
         ingredients: ingredients.length > 0 ? ingredients : [],
-        instructions: recipe.steps ? JSON.parse(recipe.steps) : [],
-        mood: recipe.emotions ? JSON.parse(recipe.emotions) : [],
+        instructions: recipe.steps && recipe.steps.trim() !== '' ? 
+          JSON.parse(recipe.steps) : [],
+        mood: recipe.emotions && recipe.emotions.trim() !== '' ? 
+          JSON.parse(recipe.emotions) : [],
         userId: recipe.userId,
         isFavorite: false
       };
