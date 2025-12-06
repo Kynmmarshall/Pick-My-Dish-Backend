@@ -113,7 +113,6 @@ router.get('/recipes', async (req, res) => {
         r.cooking_time,
         r.calories,
         r.image_path,
-        r.ingredients_json,
         r.emotions,
         r.steps,
         r.user_id,
