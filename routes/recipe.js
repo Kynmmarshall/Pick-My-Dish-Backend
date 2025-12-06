@@ -117,49 +117,65 @@ router.get('/recipes', async (req, res) => {
   try {
     console.log('📋 Fetching all recipes');
     
-    // Simple query to get all recipes
     const [recipes] = await db.execute(`
       SELECT 
-      r.id,
-      r.name,
-      r.cooking_time,
-      r.calories,
-      r.image_path,
-      r.ingredients_json,
-      r.emotions,
-      r.steps,
-      r.user_id,
-      c.name as category,
-      (
-        SELECT COUNT(*) 
-        FROM user_favorites uf 
-        WHERE uf.recipe_id = r.id
-      ) as favorite_count
-    FROM recipes r
-    LEFT JOIN categories c ON r.category_id = c.id
-    ORDER BY r.created_at DESC
+        r.id,
+        r.name,
+        r.cooking_time,
+        r.calories,
+        r.image_path,
+        r.ingredients_json,
+        r.emotions,
+        r.steps,
+        r.user_id,
+        c.name as category
+      FROM recipes r
+      LEFT JOIN categories c ON r.category_id = c.id
+      ORDER BY r.created_at DESC
     `);
     
     console.log(`✅ Found ${recipes.length} recipes`);
     
-    // Parse JSON fields and structure response
-    const formattedRecipes = recipes.map(recipe => ({
-      id: recipe.id,
-      name: recipe.name,
-      category: recipe.category || 'Main Course',
-      cooking_time: recipe.cooking_time,
-      calories: recipe.calories,
-      image_path: recipe.image_path || 'assets/recipes/test.png',
-      ingredients: JSON.parse(recipe.ingredients_json || '[]'),
-      steps: JSON.parse(recipe.steps || '[]'),
-      emotions: JSON.parse(recipe.emotions || '[]'),
-      user_id: recipe.user_id,
-      isFavorite: recipe.favorite_count > 0
-    }));
-
-    // Return recipes as-is for now
+    // Parse JSON fields safely
+    const formattedRecipes = recipes.map(recipe => {
+      try {
+        return {
+          id: recipe.id,
+          name: recipe.name,
+          category: recipe.category || 'Main Course',
+          time: recipe.cooking_time, // Use 'time' to match your model
+          calories: recipe.calories,
+          image_path: recipe.image_path || 'assets/recipes/test.png',
+          ingredients: recipe.ingredients_json ? 
+            JSON.parse(recipe.ingredients_json) : [],
+          instructions: recipe.steps ? // Use 'instructions' to match your model
+            JSON.parse(recipe.steps) : [],
+          mood: recipe.emotions ? // Use 'mood' to match your model
+            JSON.parse(recipe.emotions) : [],
+          userId: recipe.user_id,
+          isFavorite: false // Default
+        };
+      } catch (parseError) {
+        console.error('❌ Error parsing recipe:', recipe.id, parseError);
+        return {
+          id: recipe.id,
+          name: recipe.name,
+          category: recipe.category || 'Main Course',
+          time: recipe.cooking_time || '30 mins',
+          calories: recipe.calories || '0',
+          image_path: recipe.image_path || 'assets/recipes/test.png',
+          ingredients: [],
+          instructions: [],
+          mood: [],
+          userId: recipe.user_id,
+          isFavorite: false
+        };
+      }
+    });
+    
     res.json({ 
       success: true,
+      count: formattedRecipes.length,
       recipes: formattedRecipes 
     });
     
