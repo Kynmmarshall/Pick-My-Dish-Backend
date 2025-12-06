@@ -104,21 +104,21 @@ router.post('/recipes', upload.single('picture'), async (req, res) => {
 // 2. GET /api/recipes - Get all recipes (simplified)
 router.get('/recipes', async (req, res) => {
   try {
-    console.log('📋 Fetching all recipes from database');
+    console.log('📋 Fetching all recipes');
     
-    // Query database for actual recipes
-    const [dbRecipes] = await db.execute(`
+    const [recipes] = await db.execute(`
       SELECT 
         r.id,
         r.name,
-        r.cooking_time as time,
+        r.cooking_time,
         r.calories,
         r.image_path,
+        r.ingredients_json,
         r.emotions,
         r.steps,
-        r.user_id as userId,
-        c.name as category,
-        GROUP_CONCAT(DISTINCT i.name) as ingredient_names
+        r.user_id,
+        c.name as category_name,
+        GROUP_CONCAT(i.name) as ingredient_names
       FROM recipes r
       LEFT JOIN categories c ON r.category_id = c.id
       LEFT JOIN recipe_ingredients ri ON r.id = ri.recipe_id
@@ -127,56 +127,20 @@ router.get('/recipes', async (req, res) => {
       ORDER BY r.created_at DESC
     `);
     
-    console.log(`✅ Found ${dbRecipes.length} actual recipes in database`);
+    console.log(`✅ Found ${recipes.length} recipes`);
     
-    // Parse JSON safely
-    const safeJsonParse = (str) => {
-      if (!str || str === 'null' || str === 'NULL' || str.trim() === '') return [];
-      try {
-        const parsed = JSON.parse(str);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (e) {
-        console.log('⚠️ JSON parse warning:', e.message);
-        return [];
-      }
-    };
-    
-    // Format recipes from actual database data
-    const formattedRecipes = dbRecipes.map(recipe => {
-      console.log(`Processing DB recipe ${recipe.id}: ${recipe.name}`);
-      
-      return {
-        id: recipe.id,
-        name: recipe.name,
-        category: recipe.category || 'Main Course',
-        time: recipe.time || '30 mins',
-        calories: recipe.calories || '0',
-        image_path: recipe.image_path || 'assets/recipes/test.png',
-        ingredients: recipe.ingredient_names ? recipe.ingredient_names.split(',') : [],
-        instructions: safeJsonParse(recipe.steps), // From 'steps' field
-        mood: safeJsonParse(recipe.emotions),
-        userId: recipe.userId,
-        isFavorite: false
-      };
-    });
-    
-    // Debug: show first recipe data
-    if (formattedRecipes.length > 0) {
-      console.log('First recipe from DB:', JSON.stringify(formattedRecipes[0], null, 2));
-    }
-    
+    // Send raw data - let Flutter handle parsing
     res.json({ 
       success: true, 
-      count: formattedRecipes.length,
-      recipes: formattedRecipes 
+      count: recipes.length,
+      recipes: recipes  // Send as-is
     });
     
   } catch (error) {
     console.error('❌ Get recipes error:', error);
     res.status(500).json({ 
       success: false,
-      error: 'Failed to fetch recipes',
-      details: error.message 
+      error: error.message 
     });
   }
 });
