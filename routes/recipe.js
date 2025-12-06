@@ -44,148 +44,117 @@ const upload = multer({
 // 1. POST /api/recipes - Create recipe with picture
 router.post('/recipes', upload.single('picture'), async (req, res) => {
   try {
-    console.log('📝 Creating new recipe:', req.body);
-    console.log('📸 File received:', req.file ? 'Yes' : 'No');
-    
     const { 
       name, 
-      category, 
+      category, // Category name (e.g., "Breakfast")
       time, 
       calories, 
-      ingredients, 
-      instructions, 
+      ingredients, // Array of ingredient IDs
+      instructions, // Array of strings
+      emotions, // Array of strings
       userId 
     } = req.body;
     
-    // Validate required fields
-    if (!name || !category || !userId) {
-      return res.status(400).json({ error: 'Name, category, and userId are required' });
-    }
+    // 1. Find category ID
+    const [categoryResult] = await db.execute(
+      'SELECT id FROM categories WHERE name = ?',
+      [category]
+    );
+    const categoryId = categoryResult[0]?.id || 1; // Default to Breakfast
     
-    let imagePath = null;
-    if (req.file) {
-      // Store relative path
-      imagePath = req.file.path.replace(/^.*[\\\/]uploads[\\\/]/, 'uploads/');
-      console.log('🖼️ Picture saved at:', imagePath);
-    }
-    
-    // Convert arrays to JSON strings for database storage
-    const ingredientsJson = Array.isArray(ingredients) 
-      ? JSON.stringify(ingredients) 
-      : ingredients;
-    
-    const instructionsJson = Array.isArray(instructions) 
-      ? JSON.stringify(instructions) 
-      : instructions;
-    
-    const [result] = await db.execute(
-      `INSERT INTO recipes (user_id, name, category_id, cooking_time, calories, ingredients, instructions, image_path) 
+    // 2. Insert recipe
+    const [recipeResult] = await db.execute(
+      `INSERT INTO recipes 
+        (user_id, name, category_id, cooking_time, calories, 
+         steps, emotions, image_path) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         userId, 
         name, 
-        category, 
-        time || null, 
-        calories || null, 
-        ingredientsJson || null, 
-        instructionsJson || null, 
-        imagePath
+        categoryId, 
+        time, 
+        calories, 
+        JSON.stringify(instructions || []),
+        JSON.stringify(emotions || []),
+        req.file ? req.file.path : null
       ]
     );
     
-    console.log('✅ Recipe created with ID:', result.insertId);
+    // 3. Insert into recipe_ingredients table
+    if (ingredients && Array.isArray(ingredients)) {
+      for (const ingredient of ingredients) {
+        await db.execute(
+          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id) VALUES (?, ?)',
+          [recipeResult.insertId, ingredient]
+        );
+      }
+    }
     
     res.status(201).json({ 
-      success: true,
-      message: 'Recipe created successfully', 
-      recipeId: result.insertId,
-      imagePath: imagePath 
+      success: true, 
+      recipeId: recipeResult.insertId 
     });
     
   } catch (error) {
-    console.error('❌ Recipe creation error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to create recipe',
-      details: error.message 
-    });
+    console.error('Error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
 // 2. GET /api/recipes - Get all recipes (simplified)
 router.get('/recipes', async (req, res) => {
   try {
-    console.log('📋 Fetching all recipes');
-    
     const [recipes] = await db.execute(`
       SELECT 
         r.id,
         r.name,
-        r.cooking_time,
+        r.cooking_time as time,
         r.calories,
         r.image_path,
-        r.ingredients_json,
         r.emotions,
         r.steps,
-        r.user_id,
-        c.name as category
+        r.user_id as userId,
+        c.name as category,
+        GROUP_CONCAT(DISTINCT i.name) as ingredient_names,
+        GROUP_CONCAT(DISTINCT CONCAT(i.name, '|', ri.quantity, '|', ri.unit)) as ingredient_details
       FROM recipes r
       LEFT JOIN categories c ON r.category_id = c.id
+      LEFT JOIN recipe_ingredients ri ON r.id = ri.recipe_id
+      LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+      GROUP BY r.id
       ORDER BY r.created_at DESC
     `);
     
-    console.log(`✅ Found ${recipes.length} recipes`);
-    
-    // Parse JSON fields safely
     const formattedRecipes = recipes.map(recipe => {
-      try {
-        return {
-          id: recipe.id,
-          name: recipe.name,
-          category: recipe.category || 'Main Course',
-          time: recipe.cooking_time, // Use 'time' to match your model
-          calories: recipe.calories,
-          image_path: recipe.image_path || 'assets/recipes/test.png',
-          ingredients: recipe.ingredients_json ? 
-            JSON.parse(recipe.ingredients_json) : [],
-          instructions: recipe.steps ? // Use 'instructions' to match your model
-            JSON.parse(recipe.steps) : [],
-          mood: recipe.emotions ? // Use 'mood' to match your model
-            JSON.parse(recipe.emotions) : [],
-          userId: recipe.user_id,
-          isFavorite: false // Default
-        };
-      } catch (parseError) {
-        console.error('❌ Error parsing recipe:', recipe.id, parseError);
-        return {
-          id: recipe.id,
-          name: recipe.name,
-          category: recipe.category || 'Main Course',
-          time: recipe.cooking_time || '30 mins',
-          calories: recipe.calories || '0',
-          image_path: recipe.image_path || 'assets/recipes/test.png',
-          ingredients: [],
-          instructions: [],
-          mood: [],
-          userId: recipe.user_id,
-          isFavorite: false
-        };
+      // Parse ingredients from recipe_ingredients table
+      const ingredients = [];
+      if (recipe.ingredient_details) {
+        const items = recipe.ingredient_details.split(',');
+        items.forEach(item => {
+          const [name, quantity, unit] = item.split('|');
+          ingredients.push(`${quantity || ''} ${unit || ''} ${name}`.trim());
+        });
       }
+      
+      return {
+        id: recipe.id,
+        name: recipe.name,
+        category: recipe.category,
+        time: recipe.time,
+        calories: recipe.calories,
+        image_path: recipe.image_path,
+        ingredients: ingredients.length > 0 ? ingredients : [],
+        instructions: recipe.steps ? JSON.parse(recipe.steps) : [],
+        mood: recipe.emotions ? JSON.parse(recipe.emotions) : [],
+        userId: recipe.userId,
+        isFavorite: false
+      };
     });
     
-    res.json({ 
-      success: true,
-      count: formattedRecipes.length,
-      recipes: formattedRecipes 
-    });
-    
+    res.json({ success: true, recipes: formattedRecipes });
   } catch (error) {
-    console.error('❌ Get recipes error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to fetch recipes',
-      details: error.message 
-    });
+    console.error('Get recipes error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
