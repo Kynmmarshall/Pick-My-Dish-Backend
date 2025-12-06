@@ -137,41 +137,39 @@ router.get('/recipes', async (req, res) => {
     console.log(`✅ Found ${recipes.length} recipes`);
     
     // Parse JSON fields safely
-    const formattedRecipes = recipes.map(recipe => {
-      try {
-        return {
-          id: recipe.id,
-          name: recipe.name,
-          category: recipe.category || 'Main Course',
-          time: recipe.cooking_time, // Use 'time' to match your model
-          calories: recipe.calories,
-          image_path: recipe.image_path || 'assets/recipes/test.png',
-          ingredients: recipe.ingredients_json ? 
-            JSON.parse(recipe.ingredients_json) : [],
-          instructions: recipe.steps ? // Use 'instructions' to match your model
-            JSON.parse(recipe.steps) : [],
-          mood: recipe.emotions ? // Use 'mood' to match your model
-            JSON.parse(recipe.emotions) : [],
-          userId: recipe.user_id,
-          isFavorite: false // Default
-        };
-      } catch (parseError) {
-        console.error('❌ Error parsing recipe:', recipe.id, parseError);
-        return {
-          id: recipe.id,
-          name: recipe.name,
-          category: recipe.category || 'Main Course',
-          time: recipe.cooking_time || '30 mins',
-          calories: recipe.calories || '0',
-          image_path: recipe.image_path || 'assets/recipes/test.png',
-          ingredients: [],
-          instructions: [],
-          mood: [],
-          userId: recipe.user_id,
-          isFavorite: false
-        };
+  
+const formattedRecipes = recipes.map(recipe => {
+  // Helper function to safely parse JSON
+    const safeJsonParse = (str, fallback = []) => {
+      if (!str || str === 'null' || str === 'NULL' || str.trim() === '') {
+        return fallback;
       }
-    });
+      try {
+        // Handle already parsed objects
+        if (typeof str === 'object') return str;
+        // Handle empty JSON arrays
+        if (str === '[]' || str === '{}') return fallback;
+        return JSON.parse(str);
+      } catch (e) {
+        console.log('⚠️ JSON parse warning for:', str);
+        return fallback;
+      }
+    };
+
+    return {
+      id: recipe.id,
+      name: recipe.name,
+      category: recipe.category || 'Main Course',
+      time: recipe.cooking_time || '30 mins',
+      calories: recipe.calories || '0',
+      image_path: recipe.image_path || 'assets/recipes/test.png',
+      ingredients: safeJsonParse(recipe.ingredients_json, []),
+      instructions: safeJsonParse(recipe.steps, []),
+      mood: safeJsonParse(recipe.emotions, []),
+      userId: recipe.user_id,
+      isFavorite: false
+    };
+  });
     
     res.json({ 
       success: true,
