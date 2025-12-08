@@ -42,16 +42,25 @@ const upload = multer({
 });
 
 // 1. POST /api/recipes - Create recipe with picture
-router.post('/recipes', upload.single('picture'), async (req, res) => {
+router.post('/recipes', upload.single('image'), async (req, res) => {
   try {
     const { 
       name, 
       category, // Category name (e.g., "Breakfast")
       time, 
       calories, 
-      ingredients, // Array of ingredient IDs
-      instructions, // Array of strings
-      emotions, // Array of strings
+      // Parse JSON strings from form fields
+     ingredients = req.body.ingredients 
+      ? JSON.parse(req.body.ingredients) 
+      : [],
+    
+    instructions = req.body.instructions 
+      ? JSON.parse(req.body.instructions) 
+      : [],
+    
+    emotions = req.body.emotions 
+      ? JSON.parse(req.body.emotions) 
+      : [],// Array of strings
       userId 
     } = req.body;
     
@@ -156,11 +165,20 @@ router.get('/ingredients', async (req, res) => {
   }
 });
 
-// GET /api/categories - For dropdown
-router.get('/categories', async (req, res) => {
+//endpoint for adding ingredients
+router.post('/ingredients', async (req, res) => {
   try {
-    const [categories] = await db.execute('SELECT id, name FROM categories ORDER BY name');
-    res.json({ success: true, categories });
+    const { name } = req.body;
+    
+    const [result] = await db.execute(
+      'INSERT INTO ingredients (name) VALUES (?)',
+      [name]
+    );
+    
+    res.status(201).json({ 
+      success: true, 
+      ingredientId: result.insertId 
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
