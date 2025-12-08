@@ -8,36 +8,31 @@ const fs = require('fs');
 // Configure multer for recipe pictures
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Create directory if it doesn't exist
-    const uploadDir = 'uploads/recipes-pictures/';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
+    cb(null, 'uploads/recipes-pictures/');
   },
   filename: (req, file, cb) => {
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname);
-    cb(null, `recipe-${uniqueSuffix}${extension}`);
+    const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueName + path.extname(file.originalname));
   }
 });
 
+// Add proper file filter
+const fileFilter = (req, file, cb) => {
+  // Accept only image files
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
 const upload = multer({ 
   storage: storage,
+  fileFilter: fileFilter, // Add this
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'));
-    }
   }
 });
 
