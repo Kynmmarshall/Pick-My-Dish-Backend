@@ -117,11 +117,13 @@ router.get('/recipes', async (req, res) => {
         r.steps,
         r.user_id,
         c.name as category_name,
-        GROUP_CONCAT(i.name) as ingredient_names
+        GROUP_CONCAT(i.name) as ingredient_names,
+        u.username as author_name
       FROM recipes r
       LEFT JOIN categories c ON r.category_id = c.id
       LEFT JOIN recipe_ingredients ri ON r.id = ri.recipe_id
       LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+      LEFT JOIN users u ON r.user_id = u.id
       GROUP BY r.id
       ORDER BY r.created_at DESC
     `);
