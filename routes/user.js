@@ -108,15 +108,18 @@ router.get('/:userId/favorites', async (req, res) => {
     const [favorites] = await db.execute(`
       SELECT r.*, 
         c.name as category_name,
-        GROUP_CONCAT(DISTINCT i.name) as ingredient_names
+        GROUP_CONCAT(DISTINCT i.name) as ingredient_names,
+        MAX(uf.created_at) as favorite_date
       FROM user_favorites uf
       JOIN recipes r ON uf.recipe_id = r.id
       LEFT JOIN categories c ON r.category_id = c.id
       LEFT JOIN recipe_ingredients ri ON r.id = ri.recipe_id
       LEFT JOIN ingredients i ON ri.ingredient_id = i.id
       WHERE uf.user_id = ?
-      GROUP BY r.id
-      ORDER BY uf.created_at DESC
+      GROUP BY r.id, r.name, r.user_id, r.category_id, r.emotions, r.cooking_time, 
+              r.calories, r.image_path, r.steps, r.created_at, r.updated_at,
+              c.name
+      ORDER BY MAX(uf.created_at) DESC
     `, [userId]);
     
     res.json({ favorites });
