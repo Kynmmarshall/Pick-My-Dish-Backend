@@ -100,4 +100,75 @@ router.get('/profile-picture', async (req, res) => {
   }
 });
 
+// GET user's favorite recipes
+router.get('/:userId/favorites', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    
+    const [favorites] = await db.execute(`
+      SELECT r.*, 
+        c.name as category_name,
+        GROUP_CONCAT(DISTINCT i.name) as ingredient_names
+      FROM user_favorites uf
+      JOIN recipes r ON uf.recipe_id = r.id
+      LEFT JOIN categories c ON r.category_id = c.id
+      LEFT JOIN recipe_ingredients ri ON r.id = ri.recipe_id
+      LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+      WHERE uf.user_id = ?
+      GROUP BY r.id
+      ORDER BY uf.created_at DESC
+    `, [userId]);
+    
+    res.json({ favorites });
+  } catch (error) {
+    console.error('Error fetching favorites:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST add favorite recipe
+router.post('/favorites', async (req, res) => {
+  try {
+    const { userId, recipeId } = req.body;
+    
+    // Check if already favorited
+    const [existing] = await db.execute(
+      'SELECT * FROM user_favorites WHERE user_id = ? AND recipe_id = ?',
+      [userId, recipeId]
+    );
+    
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'Recipe already in favorites' });
+    }
+    
+    await db.execute(
+      'INSERT INTO user_favorites (user_id, recipe_id) VALUES (?, ?)',
+      [userId, recipeId]
+    );
+    
+    res.status(201).json({ message: 'Recipe added to favorites' });
+  } catch (error) {
+    console.error('Error adding favorite:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE remove favorite recipe
+router.delete('/favorites', async (req, res) => {
+  try {
+    const { userId, recipeId } = req.body;
+    
+    await db.execute(
+      'DELETE FROM user_favorites WHERE user_id = ? AND recipe_id = ?',
+      [userId, recipeId]
+    );
+    
+    res.json({ message: 'Recipe removed from favorites' });
+  } catch (error) {
+    console.error('Error removing favorite:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
 module.exports = router;
