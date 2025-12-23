@@ -268,7 +268,7 @@ router.get('/with-permissions', async (req, res) => {
 });
 
 // DELETE /api/recipes/:id - Delete recipe
-router.delete('/:id', async (req, res) => {
+router.delete('/recipes/:id', async (req, res) => {
   try {
     console.log('📥 DELETE /api/recipes/:id called');
     console.log('   Recipe ID:', req.params.id);
@@ -329,7 +329,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // PUT /api/recipes/:id - Update recipe
-router.put('/:id', upload.single('image'), async (req, res) => {
+router.put('/recipes/:id', upload.single('image'), async (req, res) => {
   try {
     console.log('📥 PUT /api/recipes/:id called');
     console.log('   Recipe ID:', req.params.id);
