@@ -16,6 +16,40 @@ const storage = multer.diskStorage({
   }
 });
 
+// Add this middleware at the top of recipeRoutes.js
+const checkRecipeOwnership = async (req, res, next) => {
+  try {
+    const recipeId = req.params.id || req.params.recipeId;
+    const { userId } = req.body;
+    
+    const recipe = await Recipe.findByPk(recipeId);
+    if (!recipe) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    
+    const user = await User.findByPk(userId);
+    const isAdmin = user?.is_admin || false;
+    
+    // If user is admin, allow all operations
+    if (isAdmin) {
+      req.isAdmin = true;
+      req.recipe = recipe;
+      return next();
+    }
+    
+    // Check if user owns the recipe
+    if (recipe.user_id != userId) {
+      return res.status(403).json({ error: 'Not authorized to modify this recipe' });
+    }
+    
+    req.isAdmin = false;
+    req.recipe = recipe;
+    next();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Add proper file filter
 const fileFilter = (req, file, cb) => {
   // Accept only image files
@@ -132,6 +166,7 @@ router.post('/recipes', upload.single('image'), async (req, res) => {
     });
   }
 });
+
 // 2. GET /api/recipes - Get all recipes (simplified)
 router.get('/recipes', async (req, res) => {
   try {
@@ -206,4 +241,70 @@ router.post('/ingredients', async (req, res) => {
   }
 });
 
+// GET /api/recipes/with-permissions?userId= - Get recipes with edit/delete permissions
+router.get('/with-permissions', async (req, res) => {
+  try {
+    const userId = req.query.userId;
+    const user = await User.findByPk(userId);
+    const isAdmin = user?.is_admin || false;
+    
+    const recipes = await Recipe.findAll({
+      include: [
+        { model: User, as: 'author', attributes: ['id', 'username'] },
+        { model: Category, attributes: ['name'] }
+      ]
+    });
+    
+    const recipesWithPermissions = recipes.map(recipe => ({
+      ...recipe.toJSON(),
+      canEdit: isAdmin || recipe.user_id == userId,
+      canDelete: isAdmin || recipe.user_id == userId,
+      creator_id: recipe.user_id
+    }));
+    
+    res.json({ recipes: recipesWithPermissions });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Replace your current DELETE /:id route with:
+router.delete('/:id', checkRecipeOwnership, async (req, res) => {
+  try {
+    await req.recipe.destroy();
+    res.json({ message: 'Recipe deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Replace your current PUT /:id route with:
+router.put('/:id', checkRecipeOwnership, async (req, res) => {
+  try {
+    const { name, category, time, calories, ingredients, instructions, emotions } = req.body;
+    
+    // Update recipe
+    await req.recipe.update({
+      name,
+      category_id: category, // or however you handle category
+      cooking_time: time,
+      calories,
+      steps: instructions,
+      emotions
+    });
+    
+    // Update ingredients if provided
+    if (ingredients) {
+      await RecipeIngredient.destroy({ where: { recipe_id: req.recipe.id } });
+      const ingredientPromises = ingredients.map(ingId => 
+        RecipeIngredient.create({ recipe_id: req.recipe.id, ingredient_id: ingId })
+      );
+      await Promise.all(ingredientPromises);
+      }
+      
+      res.json({ message: 'Recipe updated successfully', recipe: req.recipe });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 module.exports = router;

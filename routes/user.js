@@ -381,5 +381,14 @@ router.get('/debug/favorites/:userId', async (req, res) => {
   }
 });
 
+// check if user is admin
+router.get('/:userId/is-admin', async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.userId);
+    res.json({ isAdmin: user?.is_admin || false });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 module.exports = router;
