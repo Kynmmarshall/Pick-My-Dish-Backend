@@ -279,6 +279,10 @@ router.delete('/:id', checkRecipeOwnership, async (req, res) => {
 
 // Replace your current PUT /:id route with:
 router.put('/:id', checkRecipeOwnership, async (req, res) => {
+  console.log('📥 PUT /recipes/:id called');
+  console.log('   Recipe ID:', req.params.id);
+  console.log('   User ID:', req.body.userId);
+  console.log('   Body:', req.body);
   try {
     const { name, category, time, calories, ingredients, instructions, emotions } = req.body;
     
