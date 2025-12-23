@@ -16,7 +16,7 @@ const storage = multer.diskStorage({
   }
 });
 
-// Add this middleware at the top of recipeRoutes.js
+// check if user owns the recipe or is admin
 const checkRecipeOwnership = async (req, res, next) => {
   try {
     const recipeId = req.params.id || req.params.recipeId;
@@ -259,7 +259,6 @@ router.get('/with-permissions', async (req, res) => {
       ...recipe.toJSON(),
       canEdit: isAdmin || recipe.user_id == userId,
       canDelete: isAdmin || recipe.user_id == userId,
-      creator_id: recipe.user_id
     }));
     
     res.json({ recipes: recipesWithPermissions });
