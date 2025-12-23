@@ -277,37 +277,85 @@ router.delete('/:id', checkRecipeOwnership, async (req, res) => {
   }
 });
 
-// Replace your current PUT /:id route with:
-router.put('/:id', checkRecipeOwnership, async (req, res) => {
-  console.log('📥 PUT /recipes/:id called');
-  console.log('   Recipe ID:', req.params.id);
-  console.log('   User ID:', req.body.userId);
-  console.log('   Body:', req.body);
+// PUT /api/recipes/:id - Update recipe
+router.put('/:id', async (req, res) => {
   try {
-    const { name, category, time, calories, ingredients, instructions, emotions } = req.body;
+    console.log('📥 PUT /api/recipes/:id called');
+    console.log('   Recipe ID:', req.params.id);
+    console.log('   Body fields:', req.body);
+    
+    const { userId, name, category, time, calories, ingredients, instructions, emotions } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
+    // Find the recipe
+    const recipe = await Recipe.findByPk(req.params.id);
+    if (!recipe) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    
+    // Check if user is admin or recipe owner
+    const user = await User.findByPk(userId);
+    const isAdmin = user?.is_admin || false;
+    
+    if (!isAdmin && recipe.user_id != userId) {
+      return res.status(403).json({ error: 'Not authorized to update this recipe' });
+    }
+    
+    // Handle image upload if present
+    let imagePath = recipe.image_path;
+    if (req.files && req.files.image) {
+      const image = req.files.image;
+      const fileName = `recipe-${Date.now()}-${Math.round(Math.random() * 1e9)}.png`;
+      const uploadPath = path.join(__dirname, '../uploads/recipes-pictures', fileName);
+      
+      await image.mv(uploadPath);
+      imagePath = `uploads/recipes-pictures/${fileName}`;
+    }
+    
+    // Find or create category
+    let categoryRecord = await Category.findOne({ where: { name: category } });
+    if (!categoryRecord) {
+      categoryRecord = await Category.create({ name: category });
+    }
     
     // Update recipe
-    await req.recipe.update({
-      name,
-      category_id: category, // or however you handle category
-      cooking_time: time,
-      calories,
-      steps: instructions,
-      emotions
+    await recipe.update({
+      name: name || recipe.name,
+      category_id: categoryRecord.id,
+      cooking_time: time || recipe.cooking_time,
+      calories: calories || recipe.calories,
+      image_path: imagePath,
+      steps: instructions ? JSON.parse(instructions) : recipe.steps,
+      emotions: emotions ? JSON.parse(emotions) : recipe.emotions,
     });
     
     // Update ingredients if provided
     if (ingredients) {
-      await RecipeIngredient.destroy({ where: { recipe_id: req.recipe.id } });
-      const ingredientPromises = ingredients.map(ingId => 
-        RecipeIngredient.create({ recipe_id: req.recipe.id, ingredient_id: ingId })
-      );
-      await Promise.all(ingredientPromises);
-      }
+      const ingredientIds = JSON.parse(ingredients);
+      await RecipeIngredient.destroy({ where: { recipe_id: recipe.id } });
       
-      res.json({ message: 'Recipe updated successfully', recipe: req.recipe });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+      if (ingredientIds.length > 0) {
+        const ingredientPromises = ingredientIds.map(ingId => 
+          RecipeIngredient.create({ recipe_id: recipe.id, ingredient_id: ingId })
+        );
+        await Promise.all(ingredientPromises);
+      }
     }
-  });
+    
+    console.log('✅ Recipe updated successfully');
+    res.json({ 
+      success: true, 
+      message: 'Recipe updated successfully',
+      recipe: recipe
+    });
+    
+  } catch (error) {
+    console.error('❌ Error updating recipe:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
