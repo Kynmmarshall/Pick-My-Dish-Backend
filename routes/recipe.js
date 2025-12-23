@@ -267,22 +267,74 @@ router.get('/with-permissions', async (req, res) => {
   }
 });
 
-// Replace your current DELETE /:id route with:
-router.delete('/:id', checkRecipeOwnership, async (req, res) => {
+// DELETE /api/recipes/:id - Delete recipe
+router.delete('/:id', async (req, res) => {
   try {
-    await req.recipe.destroy();
-    res.json({ message: 'Recipe deleted successfully' });
+    console.log('📥 DELETE /api/recipes/:id called');
+    console.log('   Recipe ID:', req.params.id);
+    console.log('   Request body:', req.body);
+    
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
+    // 1. Check if recipe exists
+    const [recipeRows] = await db.execute(
+      'SELECT * FROM recipes WHERE id = ?',
+      [req.params.id]
+    );
+    
+    if (recipeRows.length === 0) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    
+    const recipe = recipeRows[0];
+    
+    // 2. Check if user is admin or recipe owner
+    const [userRows] = await db.execute(
+      'SELECT is_admin FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    const isAdmin = userRows[0]?.is_admin === 1;
+    
+    if (!isAdmin && recipe.user_id != userId) {
+      return res.status(403).json({ error: 'Not authorized to delete this recipe' });
+    }
+    
+    // 3. Delete associated recipe ingredients first
+    await db.execute(
+      'DELETE FROM recipe_ingredients WHERE recipe_id = ?',
+      [req.params.id]
+    );
+    
+    // 4. Delete the recipe
+    await db.execute(
+      'DELETE FROM recipes WHERE id = ?',
+      [req.params.id]
+    );
+    
+    console.log('✅ Recipe deleted successfully');
+    res.json({ 
+      success: true, 
+      message: 'Recipe deleted successfully'
+    });
+    
   } catch (error) {
+    console.error('❌ Error deleting recipe:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // PUT /api/recipes/:id - Update recipe
-router.put('/:id', async (req, res) => {
+router.put('/:id', upload.single('image'), async (req, res) => {
   try {
     console.log('📥 PUT /api/recipes/:id called');
     console.log('   Recipe ID:', req.params.id);
     console.log('   Body fields:', req.body);
+    console.log('   Has file:', !!req.file);
     
     const { userId, name, category, time, calories, ingredients, instructions, emotions } = req.body;
     
@@ -290,66 +342,139 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
     
-    // Find the recipe
-    const recipe = await Recipe.findByPk(req.params.id);
-    if (!recipe) {
+    // 1. Check if recipe exists and user has permission
+    const [recipeRows] = await db.execute(
+      'SELECT * FROM recipes WHERE id = ?',
+      [req.params.id]
+    );
+    
+    if (recipeRows.length === 0) {
       return res.status(404).json({ error: 'Recipe not found' });
     }
     
+    const recipe = recipeRows[0];
+    
     // Check if user is admin or recipe owner
-    const user = await User.findByPk(userId);
-    const isAdmin = user?.is_admin || false;
+    const [userRows] = await db.execute(
+      'SELECT is_admin FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    const isAdmin = userRows[0]?.is_admin === 1;
     
     if (!isAdmin && recipe.user_id != userId) {
       return res.status(403).json({ error: 'Not authorized to update this recipe' });
     }
     
-    // Handle image upload if present
+    // 2. Find or create category
+    const [categoryRows] = await db.execute(
+      'SELECT id FROM categories WHERE name = ?',
+      [category]
+    );
+    
+    let categoryId;
+    if (categoryRows.length > 0) {
+      categoryId = categoryRows[0].id;
+    } else {
+      const [newCategory] = await db.execute(
+        'INSERT INTO categories (name) VALUES (?)',
+        [category]
+      );
+      categoryId = newCategory.insertId;
+    }
+    
+    // 3. Parse JSON fields
+    let parsedIngredients = [];
+    let parsedInstructions = [];
+    let parsedEmotions = [];
+    
+    try {
+      parsedIngredients = ingredients ? JSON.parse(ingredients) : [];
+      parsedInstructions = instructions ? JSON.parse(instructions) : [];
+      parsedEmotions = emotions ? JSON.parse(emotions) : [];
+    } catch (parseError) {
+      console.log('❌ JSON parse error:', parseError.message);
+      return res.status(400).json({ 
+        error: 'Invalid JSON data',
+        details: parseError.message 
+      });
+    }
+    
+    // 4. Handle image upload if present
     let imagePath = recipe.image_path;
-    if (req.files && req.files.image) {
-      const image = req.files.image;
-      const fileName = `recipe-${Date.now()}-${Math.round(Math.random() * 1e9)}.png`;
-      const uploadPath = path.join(__dirname, '../uploads/recipes-pictures', fileName);
-      
-      await image.mv(uploadPath);
-      imagePath = `uploads/recipes-pictures/${fileName}`;
+    if (req.file) {
+      imagePath = req.file.path;
     }
     
-    // Find or create category
-    let categoryRecord = await Category.findOne({ where: { name: category } });
-    if (!categoryRecord) {
-      categoryRecord = await Category.create({ name: category });
-    }
+    // 5. Update recipe
+    const [updateResult] = await db.execute(
+      `UPDATE recipes 
+       SET name = ?, 
+           category_id = ?, 
+           cooking_time = ?, 
+           calories = ?, 
+           image_path = ?,
+           steps = ?,
+           emotions = ?
+       WHERE id = ?`,
+      [
+        name || recipe.name,
+        categoryId,
+        time || recipe.cooking_time,
+        calories || recipe.calories,
+        imagePath,
+        JSON.stringify(parsedInstructions),
+        JSON.stringify(parsedEmotions),
+        req.params.id
+      ]
+    );
     
-    // Update recipe
-    await recipe.update({
-      name: name || recipe.name,
-      category_id: categoryRecord.id,
-      cooking_time: time || recipe.cooking_time,
-      calories: calories || recipe.calories,
-      image_path: imagePath,
-      steps: instructions ? JSON.parse(instructions) : recipe.steps,
-      emotions: emotions ? JSON.parse(emotions) : recipe.emotions,
-    });
-    
-    // Update ingredients if provided
-    if (ingredients) {
-      const ingredientIds = JSON.parse(ingredients);
-      await RecipeIngredient.destroy({ where: { recipe_id: recipe.id } });
+    // 6. Update ingredients if provided
+    if (parsedIngredients.length > 0) {
+      // Delete existing recipe ingredients
+      await db.execute(
+        'DELETE FROM recipe_ingredients WHERE recipe_id = ?',
+        [req.params.id]
+      );
       
-      if (ingredientIds.length > 0) {
-        const ingredientPromises = ingredientIds.map(ingId => 
-          RecipeIngredient.create({ recipe_id: recipe.id, ingredient_id: ingId })
+      // Insert new ingredients
+      for (const ingredientId of parsedIngredients) {
+        await db.execute(
+          'INSERT INTO recipe_ingredients (recipe_id, ingredient_id) VALUES (?, ?)',
+          [req.params.id, ingredientId]
         );
-        await Promise.all(ingredientPromises);
       }
     }
     
     console.log('✅ Recipe updated successfully');
+    
+    // 7. Get updated recipe with joins
+    const [updatedRecipeRows] = await db.execute(`
+      SELECT 
+        r.id,
+        r.name,
+        r.cooking_time,
+        r.calories,
+        r.image_path,
+        r.emotions,
+        r.steps,
+        r.user_id,
+        c.name as category_name,
+        GROUP_CONCAT(i.name) as ingredient_names,
+        u.username as author_name
+      FROM recipes r
+      LEFT JOIN categories c ON r.category_id = c.id
+      LEFT JOIN recipe_ingredients ri ON r.id = ri.recipe_id
+      LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+      LEFT JOIN users u ON r.user_id = u.id
+      WHERE r.id = ?
+      GROUP BY r.id
+    `, [req.params.id]);
+    
     res.json({ 
       success: true, 
       message: 'Recipe updated successfully',
-      recipe: recipe
+      recipe: updatedRecipeRows[0]
     });
     
   } catch (error) {
