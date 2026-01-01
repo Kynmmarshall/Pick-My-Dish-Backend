@@ -103,11 +103,11 @@ router.get('/profile-picture', auth, async (req, res) => {
 // GET user's favorite recipes
 router.get('/:userId/favorites', auth, async (req, res) => {
   console.log('📥 GET /favorites - Request received');
-  console.log('👤 User ID:', req.params.userId);
+  console.log('👤 User ID:', req.user.id);
   console.log('⏰ Time:', new Date().toISOString());
   
   try {
-    const userId = req.user.Id;
+    const userId = req.user.id;
     
     if (!userId || userId === '0') {
       console.log('❌ Invalid user ID received:', userId);

@@ -21,7 +21,7 @@ const storage = multer.diskStorage({
 const checkRecipeOwnership = async (req, res, next) => {
   try {
     const recipeId = req.params.id || req.params.recipeId;
-    const { userId } = req.body;
+    const userId = req.user.id; // FROM TOKEN
     
     const recipe = await Recipe.findByPk(recipeId);
     if (!recipe) {
