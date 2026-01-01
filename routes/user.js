@@ -101,7 +101,7 @@ router.get('/profile-picture', auth, async (req, res) => {
 });
 
 // GET user's favorite recipes
-router.get('/:userId/favorites', auth, async (req, res) => {
+router.get('/favorites', auth, async (req, res) => {
   console.log('📥 GET /favorites - Request received');
   console.log('👤 User ID:', req.user.id);
   console.log('⏰ Time:', new Date().toISOString());
@@ -329,7 +329,7 @@ router.delete('/favorites', auth, async (req, res) => {
 });
 
 // ADD THIS HELPER ENDPOINT FOR DEBUGGING
-router.get('/debug/favorites/:userId', auth, async (req, res) => {
+router.get('/debug/favorites', auth, async (req, res) => {
   console.log('🐛 DEBUG /favorites endpoint called for user:', req.user.id);
   console.log('⏰ Time:', new Date().toISOString());
   try {
@@ -384,10 +384,21 @@ router.get('/debug/favorites/:userId', auth, async (req, res) => {
 });
 
 // check if user is admin
-router.get('/:userId/is-admin', async (req, res) => {
+router.get('/is-admin', auth, async (req, res) => {
   try {
-    const user = await User.findByPk(req.params.userId);
-    res.json({ isAdmin: user?.is_admin || false });
+    const userId = req.user.id; // From JWT token
+    
+    const [users] = await db.execute(
+      'SELECT is_admin FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const isAdmin = users[0].is_admin === 1;
+    res.json({ isAdmin });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
