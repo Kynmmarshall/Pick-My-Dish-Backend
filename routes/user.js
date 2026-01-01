@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../config/database');
 const multer = require('multer'); 
 const path = require('path');     
-
+const { auth } = require('../middleware/auth');
 
 // Configure multer for file uploads 
 const storage = multer.diskStorage({
@@ -20,19 +20,20 @@ const upload = multer({ storage: storage });
 
 
 // Get user profile
-router.get('/profile', (req, res) => {
+router.get('/profile', auth, (req, res) => {
   res.json({ message: 'User profile endpoint' });
 });
 
 // Update user profile
-router.put('/profile', (req, res) => {
+router.put('/profile', auth, (req, res) => {
   res.json({ message: 'Update profile endpoint' });
 });
 
 // UPDATE USERNAME 
-router.put('/username', async (req, res) => {
+router.put('/username', auth, async (req, res) => {
   try {
-    const { username, userId } = req.body;  // ← Get userId from request
+    const { username } = req.body;  // ← Get username from request
+    const userId = req.user.id; // From auth middleware
     
     console.log('🔄 Updating username for user $userId to: $username');
 
@@ -49,10 +50,9 @@ router.put('/username', async (req, res) => {
 });
 
 // UPDATE user profile picture
-router.put('/profile-picture', upload.single('image'), async (req, res) => {
+router.put('/profile-picture', auth, upload.single('image'), async (req, res) => {
   try {
-    const userId = req.body.userId;
-    
+    const userId = req.user.id; // From auth middleware    
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
@@ -75,9 +75,9 @@ router.put('/profile-picture', upload.single('image'), async (req, res) => {
 });
 
 // GET user profile picture
-router.get('/profile-picture', async (req, res) => {
+router.get('/profile-picture', auth, async (req, res) => {
   try {
-    const userId = req.query.userId; // Get from query parameter
+    const userId = req.user.id; // Get from auth middleware
     
     const [users] = await db.execute(
       'SELECT profile_image_path FROM users WHERE id = ?',
@@ -101,13 +101,13 @@ router.get('/profile-picture', async (req, res) => {
 });
 
 // GET user's favorite recipes
-router.get('/:userId/favorites', async (req, res) => {
+router.get('/:userId/favorites', auth, async (req, res) => {
   console.log('📥 GET /favorites - Request received');
   console.log('👤 User ID:', req.params.userId);
   console.log('⏰ Time:', new Date().toISOString());
   
   try {
-    const userId = req.params.userId;
+    const userId = req.user.Id;
     
     if (!userId || userId === '0') {
       console.log('❌ Invalid user ID received:', userId);
@@ -170,14 +170,15 @@ router.get('/:userId/favorites', async (req, res) => {
 });
 
 // POST add favorite recipe
-router.post('/favorites', async (req, res) => {
+router.post('/favorites', auth, async (req, res) => {
   console.log('📥 POST /favorites - Request received');
   console.log('📦 Request body:', JSON.stringify(req.body));
   console.log('⏰ Time:', new Date().toISOString());
   
   try {
-    const { userId, recipeId } = req.body;
-    
+    const { recipeId } = req.body;
+    const userId = req.user.id; // From auth middleware
+
     if (!userId || !recipeId) {
       console.log('❌ Missing parameters:', { userId, recipeId });
       return res.status(400).json({ error: 'Missing userId or recipeId' });
@@ -252,13 +253,14 @@ router.post('/favorites', async (req, res) => {
 });
 
 // DELETE remove favorite recipe
-router.delete('/favorites', async (req, res) => {
+router.delete('/favorites', auth, async (req, res) => {
   console.log('📥 DELETE /favorites - Request received');
   console.log('📦 Request body:', JSON.stringify(req.body));
   console.log('⏰ Time:', new Date().toISOString());
   
   try {
-    const { userId, recipeId } = req.body;
+    const { recipeId } = req.body;
+    const userId = req.user.id; // From auth middleware
     
     if (!userId || !recipeId) {
       console.log('❌ Missing parameters:', { userId, recipeId });
@@ -327,11 +329,11 @@ router.delete('/favorites', async (req, res) => {
 });
 
 // ADD THIS HELPER ENDPOINT FOR DEBUGGING
-router.get('/debug/favorites/:userId', async (req, res) => {
-  console.log('🐛 DEBUG /favorites endpoint called for user:', req.params.userId);
-  
+router.get('/debug/favorites/:userId', auth, async (req, res) => {
+  console.log('🐛 DEBUG /favorites endpoint called for user:', req.user.id);
+  console.log('⏰ Time:', new Date().toISOString());
   try {
-    const userId = req.params.userId;
+    const userId = req.user.id;
     
     // Check user exists
     const [users] = await db.execute('SELECT * FROM users WHERE id = ?', [userId]);

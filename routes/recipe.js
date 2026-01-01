@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const db = require('../config/database');
 const fs = require('fs');
+const { auth } = require('../middleware/auth');
 
 // Configure multer for recipe pictures
 const storage = multer.diskStorage({
@@ -71,9 +72,10 @@ const upload = multer({
 });
 
 // 1. POST /api/recipes - Create recipe with picture
-router.post('/recipes', upload.single('image'), async (req, res) => {
+router.post('/recipes', auth, upload.single('image'), async (req, res) => {
   try {
     console.log('📥 Received form data:', req.body);
+    const userId = req.user.id;
     // 1. Get all fields from req.body
     const { 
       name, 
@@ -83,7 +85,6 @@ router.post('/recipes', upload.single('image'), async (req, res) => {
       ingredients: ingredientsJson,  // Rename to indicate it's JSON string
       instructions: instructionsJson,
       emotions: emotionsJson,
-      userId 
     } = req.body;
     
     // 2. PARSE THE JSON STRINGS HERE
@@ -268,13 +269,13 @@ router.get('/with-permissions', async (req, res) => {
 });
 
 // DELETE /api/recipes/:id - Delete recipe
-router.delete('/recipes/:id', async (req, res) => {
+router.delete('/recipes/:id', auth, async (req, res) => {
   try {
     console.log('📥 DELETE /api/recipes/:id called');
     console.log('   Recipe ID:', req.params.id);
     console.log('   Request body:', req.body);
     
-    const { userId } = req.body;
+    const userId = req.user.id; // From auth middleware
     
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
@@ -329,14 +330,14 @@ router.delete('/recipes/:id', async (req, res) => {
 });
 
 // PUT /api/recipes/:id - Update recipe
-router.put('/recipes/:id', upload.single('image'), async (req, res) => {
+router.put('/recipes/:id', auth,  upload.single('image'), async (req, res) => {
   try {
     console.log('📥 PUT /api/recipes/:id called');
     console.log('   Recipe ID:', req.params.id);
     console.log('   Body fields:', req.body);
     console.log('   Has file:', !!req.file);
-    
-    const { userId, name, category, time, calories, ingredients, instructions, emotions } = req.body;
+    const userId = req.user.id; // From auth middleware
+    const {name, category, time, calories, ingredients, instructions, emotions } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
